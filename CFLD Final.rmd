@@ -1,0 +1,424 @@
+---
+title: "CFLD NUS Challenge"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Team : Fantastic 4
+#Debosmitha Chaudhuri
+#Mayank Khanna
+#Rahul Gupta
+#Swetha Narayan
+
+```{r}
+require(foreign)
+require(ggplot2)
+require(MASS)
+require(Hmisc)
+require(reshape2)
+require(randomForest)
+```
+
+
+
+
+```{r}
+#Import data
+full_data <- read.csv("final_consolidated.csv")
+str(full_data)
+```
+
+
+
+
+## Declare ordinal Variables and numeric variables
+
+
+```{r}
+full_data$Connectivity.and.Infra <- ordered(full_data$Connectivity.and.Infra,
+                     levels = c("poor","Bad","Below Average", "Average","Above Average","Good")
+                     )
+full_data$Residential.Cost <- ordered(full_data$Residential.Cost,
+                                          levels = c("Poor","Bad","Below Average", "Average","Above Average","Good")
+)
+full_data$Proximity.to.organized.retail <- ordered(full_data$Proximity.to.organized.retail,
+                                          levels = c("Poor","Bad","Below Average", "Average","Above Average","Good")
+)
+full_data$Proximity.to.commercial.dev <- ordered(full_data$Proximity.to.commercial.dev,
+                                          levels = c("Poor","Bad","Below Average", "Average","Above Average","Good")
+)
+full_data$Scope.of.Future.Infra.dev <- ordered(full_data$Scope.of.Future.Infra.dev,
+                                          levels = c("Poor","Bad","Below Average", "Average","Above Average","Good")
+)
+full_data$Scope.of.Future.Emploment.Generation <- ordered(full_data$Scope.of.Future.Emploment.Generation,
+                                          levels = c("Poor","Bad","Below Average", "Average","Above Average","Good")
+)
+
+
+full_data$Population <- as.numeric(full_data$Population)
+```
+
+#Data Cleaning
+
+```{r}
+full_data$State.Code <-NULL
+full_data$District.Code <- NULL
+full_data$Tehsil.Code <- NULL
+full_data$Town.Code.Village.code <-NULL
+full_data$Sectors.Localities <- NULL
+full_data$Price.range <- NULL
+full_data$Ward.No <- NULL
+str(full_data)
+
+
+full_data$from.igia <- ifelse(is.na(full_data$from.igia),full_data$Distance.from.Airport,full_data$from.igia)
+full_data$price_range <- ifelse(full_data$Low.Price<=5000,"0-5000",ifelse(full_data$Low.Price<=10000,"5000-1000","Greater than 10000"))
+
+full_data$price_range <- ordered(full_data$price_range,levels = c("0-5000","5000-1000", "Greater than 10000")
+)
+```
+
+#Exploratory analysis
+```{r}
+summary(full_data)
+mod1 <- lm(data = full_data, Low.Price~Air.quality.Index+Crime.index+Connectivity.and.Infra+ 
+             Residential.Cost+Proximity.to.organized.retail+Proximity.to.commercial.dev+Scope.of.Future.Infra.dev+
+           Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+           No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+           X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+           Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+           Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+           Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+           Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+             reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+           from.igia)
+mod2 <- lm(data = full_data,Low.Price ~ Total.No..of.Houses+Child+Schedule.Caste+Schedule.Tribe+
+             Literacy+Total.Workers+Main.Worker+Marginal.Worker)
+summary(mod1)
+```
+
+#Question 1= Random forest
+
+```{r}
+library(randomForest)
+rf_data <- full_data[ , colSums(is.na(full_data)) == 0]
+dim(rf_data)
+summary(rf_data$price_range)
+mod2 <- randomForest(data = rf_data, price_range~Air.quality.Index+Crime.index
+             +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+             Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+             No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+             X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+             Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+             Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+             Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+             Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+             reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+             from.igia)
+importance(mod2)
+varImpPlot(mod2)
+```
+
+#Question 1= Elastic net
+
+```{r}
+require(glmnet)
+data_glm <- full_data[ , colSums(is.na(full_data)) == 0]
+x <- model.matrix(data=data_glm, price_range ~ Air.quality.Index+Crime.index
+                  +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+                    Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+                    No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+                    X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+                    Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+                    Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+                    Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+                    Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+                    reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+                    from.igia)
+str(data_glm)
+dim(data_glm)
+head(data_glm)
+y <- data_glm$price_range
+head(y)
+str(data_glm)
+set.seed(1)
+
+K <- 10
+n <- nrow(x)
+
+fold <- sample(rep(seq(K), length=n))
+table(fold)
+library(glmnet)
+alphas <- seq(0, 1, 0.1)
+en2.cv.error <- data.frame(alpha=alphas)
+for (i in 1:length(alphas)){
+  en2.cv <- cv.glmnet(x, y, alpha=alphas[i], family = "multinomial", type.measure = "class", foldid=fold)
+  en2.cv.error[i, "lambda.1se"] <- en2.cv$lambda.1se
+  en2.cv.error[i, "error.1se"] <- min(en2.cv$cvm) + en2.cv$cvsd[which.min(en2.cv$cvm)]
+}
+
+dim(data_glm)
+
+en2.cv.error
+
+# optimal lambda and alpha
+#en.lam <- en.cv.error[which.min(en.cv.error$error.min), "lambda.min"]
+#en.alpha <- en.cv.error[which.min(en.cv.error$error.min), "alpha"]
+
+#Choosing the most regularized model
+en2.lam <- en2.cv.error[which.min(en2.cv.error$error.1se), "lambda.1se"]
+en2.alpha <- en2.cv.error[which.min(en2.cv.error$error.1se), "alpha"]
+
+# plot optimal alpha
+plot(en2.cv.error$alpha, en2.cv.error$error.1se, type="l")
+abline(v=en2.alpha, lty=2)
+
+
+# the optimal model
+en2.mod <- glmnet(x, y, alpha=en2.alpha, family = "multinomial")
+plot(en2.mod, xvar="lambda", label = TRUE)
+abline(v=log(en2.lam2), lty=2)
+predict(en2.mod, type="coefficient", s=en2.lam, exact=TRUE)
+
+```
+
+
+Both the above models give same factors. Hence the recommended factors affecting land value are reliable
+
+#Question 2, 3- Data preperation
+
+```{r}
+#data preparation
+str(full_data)
+q2_data <- full_data[which(!is.na(full_data$distance.jewar)),]
+dim(q2_data)
+q2_data <- q2_data[ , colSums(is.na(q2_data)) == 0]
+str(q2_data)
+
+
+q2_data$jewar_benefit_flag <- ifelse(q2_data$from.igia>q2_data$distance.jewar,1,0)
+sum(q2_data$jewar_benefit_flag)
+
+#Creating future airport distance variable
+q2_data$future_airport_distance <- ifelse(q2_data$from.igia<q2_data$distance.jewar,q2_data$from.igia,q2_data$distance.jewar)
+#splitting them in test and train
+N <- nrow(q2_data)
+train.index <- sample(1:N, round(4*N/5))
+test.index <- - train.index
+
+train <- q2_data[train.index,]
+test <- q2_data[test.index,]
+
+dim(train)
+#making model matrix for different models
+x.train <- model.matrix(data = train, price_range~Air.quality.Index+Crime.index
+                  +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+                    Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+                    No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+                    X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+                    Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+                    Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+                    Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+                    Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+                    reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+                    from.igia)
+y.train <- train$price_range
+
+
+x.test <- model.matrix(data = test, price_range~Air.quality.Index+Crime.index
+                       +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+                         Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+                         No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+                         X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+                         Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+                         Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+                         Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+                         Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+                         reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+                         from.igia)
+y.test <- test$price_range
+
+```
+
+#Cross validation to choose best predictors
+
+```{r}
+#doing cross validation to find best parameters
+K <- 10
+n <- nrow(x.train)
+
+fold <- sample(rep(seq(K), length=n))
+table(fold)
+library(glmnet)
+alphas <- seq(0, 1, 0.1)
+en2.cv.error <- data.frame(alpha=alphas)
+for (i in 1:length(alphas)){
+  en2.cv <- cv.glmnet(x.train, y.train, alpha=alphas[i], family = "multinomial", type.measure = "class", foldid=fold)
+  en2.cv.error[i, "lambda.1se"] <- en2.cv$lambda.1se
+  en2.cv.error[i, "error.1se"] <- min(en2.cv$cvm) + en2.cv$cvsd[which.min(en2.cv$cvm)]
+}
+
+en2.lam2 <- en2.cv.error[which.min(en2.cv.error$error.1se), "lambda.1se"]
+en2.alpha2 <- en2.cv.error[which.min(en2.cv.error$error.1se), "alpha"]
+```
+
+```{r}
+#plots
+plot(en2.cv.error$alpha, en2.cv.error$error.1se, type="l")
+abline(v=en2.alpha2, lty=2)
+
+```
+
+
+#Optimal glmnet model
+```{r}
+# the optimal model
+en2.mod <- glmnet(x, y, alpha=en2.alpha2, family = "multinomial")
+plot(en2.mod, xvar="lambda", label = TRUE)
+abline(v=log(en2.lam2), lty=2)
+predictions <- predict(en2.mod,s=en2.lam2, newx = x.test, type = "class")
+final_df_glm <- data.frame(actual = y.test, predicted = predictions)
+```
+
+
+#Random forest Model
+```{r}
+#Random forest model
+dim(q2_data)
+?randomForest
+str(q2_data)
+mse.rfs <- rep(0, 55)
+for(m in 1:55){
+  set.seed(12)
+  rf <- randomForest(price_range ~ Air.quality.Index+Crime.index
+                     +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+                       Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+                       No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+                       X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+                       Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+                       Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+                       Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+                       Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+                       reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+                       from.igia, data=train , mtry=m)
+  mse.rfs[m] <- rf$err.rate[500]
+}
+summary(rf)
+dim(test)
+str(test)
+plot(1:55, mse.rfs, type="b", xlab="mtry", ylab="OOB Error")
+mse.rfs
+optm <- which.min(mse.rfs)
+rf_final <- randomForest(price_range ~ Air.quality.Index+Crime.index
+                               +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+                                 Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+                                 No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+                                 X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+                                 Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+                                 Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+                                 Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+                                 Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+                                 reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+                                 from.igia, data=train , mtry=optm)
+predictions_rf <- predict(rf_final, newdata = test)
+table(test$price_range, predictions_rf)
+```
+
+
+#XGBoost model
+```{r}
+library(xgboost)
+dtrain <- xgb.DMatrix(data=x.train, label=y.train)
+dtrain
+str(dtrain)
+head(getinfo(dtrain, 'label'))
+
+xgb.cv1 <- xgb.cv(data = dtrain,  objective="multi:softmax", 
+                  nrounds=5000, max_depth=4, eta=0.005, subsample=0.5, colsample_bytree=1,
+                  nfold=10, early_stopping_rounds=100, num_class = 4)
+xgb.cv1$evaluation_log$test_merror_mean
+
+
+objective <- "multi:softmax"
+cv.fold <- 10
+max_depths <- c(1, 2, 4, 6, 8)  # candidates for d
+etas <- c(0.01, 0.005, 0.001)  # candidates for lambda
+subsamples <- c(0.5, 0.75, 1)
+colsamples <- c(0.6, 0.8, 1)
+```
+
+
+#Tuning for best parameters for model
+```{r}
+set.seed(4321)
+tune.out <- data.frame()
+for (max_depth in max_depths) {
+  for (eta in etas) {
+    for (subsample in subsamples) {
+      for (colsample in colsamples) {
+        # **calculate max n.trees by my secret formula**
+        n.max <- round(100 / (eta * sqrt(max_depth)))
+        xgb.cv.fit <- xgb.cv(data = dtrain, objective=objective, nfold=cv.fold, early_stopping_rounds=100, verbose=0,
+                             nrounds=n.max, max_depth=max_depth, eta=eta, subsample=subsample, colsample_bytree=colsample, num_class = 4)
+        n.best <- xgb.cv.fit$best_ntreelimit
+        if (objective == "reg:linear") {
+          cv.err <- xgb.cv.fit$evaluation_log$test_rmse_mean[n.best]
+        } else if (objective == "multi:softmax") {
+          cv.err <- xgb.cv.fit$evaluation_log$test_merror_mean[n.best]
+        }
+        out <- data.frame(max_depth=max_depth, eta=eta, subsample=subsample, colsample=colsample, n.max=n.max, nrounds=n.best, cv.err=cv.err)
+        print(out)
+        tune.out <- rbind(tune.out, out)
+      }
+    }
+  }
+}
+
+tune.out
+opt <- which.min(tune.out$cv.err)
+nrounds.opt <-tune.out$nrounds[opt]
+max_depth.opt <- tune.out$max_depth[opt]
+eta.opt <- tune.out$eta[opt]
+subsample.opt <- tune.out$subsample[opt]
+colsample.opt <- tune.out$colsample[opt]
+```
+
+#Optimal XGBoost model
+```{r}
+xgb2 <- xgboost(data=dtrain, objective="multi:softmax", nround=nrounds.opt, max.depth=max_depth.opt, eta=eta.opt, subsample=subsample.opt, colsample_bytree=colsample.opt, num_class = 4)
+yhat.xgb2 <- predict(xgb2, x.test)
+yhat.xgb2 <- ifelse(yhat.xgb2==1,"0-5000",ifelse(yhat.xgb2==2,"5000-1000","Greater than 10000"))
+table(yhat.xgb2, y.test)
+importance_matrix <- xgb.importance(model = xgb2, feature_names = colnames(x.train))
+xgb.plot.importance(importance_matrix=importance_matrix)
+```
+
+#Recommendations for Question 2, 3
+
+```{r}
+
+test2 <- subset(q2_data,jewar_benefit_flag==1)
+test2$from.igia <- test2$future_airport_distance
+
+x.test2 <- model.matrix(data = test2, price_range~Air.quality.Index+Crime.index
+                       +Proximity.to.organized.retail+Scope.of.Future.Infra.dev+
+                         Scope.of.Future.Emploment.Generation+Population+Rural.Urban+Total.Household+Total.residence+Total.Residence..other.use+
+                         No.exclusive.room+One.room+Two.rooms+Three.rooms+Four.rooms+Five.rooms+Six.rooms.and.above+X1.Member.family+
+                         X2.Member.family+X3.Member.family+X4.Member.family+X5.Member.family+X6.8.Member.Family+X9..Member.family+
+                         Self.Owned+Rented+Other.Ownership+Tapwater.from.treated.source+Covered.well+Un.covered.well+Handpump+Tubewell.Borehole+
+                         Spring+River..Canal+Tank..Pond..Lake+Other.Water.Source+Electricity.lighting+Kerosene.lighting+Solar.Energy.lighting+
+                         Other.oil.lighting+Any.other.lighting+No.lighting+Flush.to.piped.sewer.system+Flush.to.Septic.tank+Flush.to.Other.system+
+                         Closed.drainage+Open.drainage+No.drainage+state.eodb+reforms.access.to.information+reforms.single.window+
+                         reforms.availability.of.land+reforms.construction.permit.enablers+reforms.environmental.registration.enablers+
+                         from.igia)
+y.test2 <- test2$price_range
+
+test2[which(yhat.xgb3==3),"Area.name"]
+yhat.xgb3 <- predict(xgb2, x.test2)
+y.test2
+
+```
+
